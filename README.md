@@ -52,7 +52,7 @@ const wayland_protocol_specifications = [_]std.Build.LazyPath{
   ...,
 };
 
-const wayland_protocols = b.dependency("wayland_zig", .{
+const wayland_protocols = b.dependency("wayland_protocol_codegen", .{
   .protocols = &wayland_protocol_specifications,
 }).module("wayland-protocols");
 exe.root_module.addImport("wayland-protocols", wayland_protocols);

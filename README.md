@@ -10,6 +10,9 @@ This generator currently only supports generating Zig code, but I plan
 to add an option to emit the code as a single-header C library too.
 
 
+I'll probably also give this all a cleanup pass soon. This code was all
+written rather quickly and probably can be tidied up.
+
 ## Usage
 
 ### CLI

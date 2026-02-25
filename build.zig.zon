@@ -1,0 +1,10 @@
+.{
+  .name = .wayland_protocol_codegen,
+  .version = "0.0.0",
+  .fingerprint = 0xe5b43b9ebc061f42,
+  .minimum_zig_version = "0.16.0-dev.2261+d6b3dd25a",
+  .paths = .{
+    "build.zig",
+    "src",
+  },
+}

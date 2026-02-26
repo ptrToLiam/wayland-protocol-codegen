@@ -72,11 +72,25 @@ pub fn main(init: std.process.Init) !void {
   else return error.FileNotFound;
   var buf: [1024]u8 = undefined;
   var out = out_file.writerStreaming(io, &buf);
-  var out_writer = &out.interface;
+  const out_writer = &out.interface;
 
-  var protocol_opt: ?*EntryNode = output.protocol_first;
-  try out_writer.print(OutputBeginMsg, .{});
-  _ = try out_writer.write(WaylandGeneralTypesCodePaste);
+  try write_zig_code(
+    out_writer,
+    &output,
+    debug,
+  );
+
+  try out.flush();
+}
+
+fn write_zig_code(
+  writer: *Io.Writer,
+  code_tree: *Output,
+  debug: bool,
+) !void {
+  var protocol_opt: ?*EntryNode = code_tree.protocol_first;
+  try writer.print(OutputBeginMsg, .{});
+  _ = try writer.write(WaylandGeneralTypesCodePaste);
   while (protocol_opt) |protocol| : (protocol_opt = protocol.next) {
     if (debug) std.debug.print(
       "found {} interfaces in protocol {s}!\n",
@@ -86,7 +100,7 @@ pub fn main(init: std.process.Init) !void {
       },
     );
 
-    try out_writer.print(
+    try writer.print(
       ProtocolBeginFmt,
       .{ protocol.name },
     );
@@ -94,13 +108,12 @@ pub fn main(init: std.process.Init) !void {
     var interface_opt: ?*EntryNode = protocol.interface_first;
     while (interface_opt) |interface| : (interface_opt = interface.next) {
       try write_wl_interface(
-        out_writer,
-        allocator,
+        writer,
         interface,
       );
     }
 
-    try out_writer.print(
+    try writer.print(
       ProtocolEndString,
       .{},
     );
@@ -108,88 +121,85 @@ pub fn main(init: std.process.Init) !void {
 
   // Write Combined Enum Union
   {
-    _ = try out_writer.write(CombinedEnumBeginMsg);
-    protocol_opt = output.protocol_first;
+    _ = try writer.write(CombinedEnumBeginMsg);
+    protocol_opt = code_tree.protocol_first;
     while (protocol_opt) |protocol| : (protocol_opt = protocol.next) {
       var interface_opt: ?*EntryNode = protocol.interface_first;
       while (interface_opt) |interface| : (interface_opt = interface.next) {
         var enum_opt: ?*EntryNode = interface.enum_first;
         while (enum_opt) |@"enum"| : (enum_opt = @"enum".next) {
-          try out_writer.print(
+          try writer.print(
             CombinedEnumEntryFmt,
             .{ interface.name, @"enum".name, interface.name, @"enum".identifier },
           );
         }
       }
     }
-    _ = try out_writer.write(CombinedEnumEndMsg);
+    _ = try writer.write(CombinedEnumEndMsg);
   }
 
   // Write Combined Event Union
   {
-    _ = try out_writer.write(CombinedEventBeginMsg);
-    protocol_opt = output.protocol_first;
+    _ = try writer.write(CombinedEventBeginMsg);
+    protocol_opt = code_tree.protocol_first;
     while (protocol_opt) |protocol| : (protocol_opt = protocol.next) {
       var interface_opt: ?*EntryNode = protocol.interface_first;
       while (interface_opt) |interface| : (interface_opt = interface.next) {
         var event_opt: ?*EntryNode = interface.event_first;
         while (event_opt) |event| : (event_opt = event.next) {
-          try out_writer.print(
+          try writer.print(
             CombinedEventEntryFmt,
             .{interface.name, event.name, interface.name, event.identifier},
           );
         }
       }
     }
-    _ = try out_writer.write(CombinedEventEndMsg);
+    _ = try writer.write(CombinedEventEndMsg);
   }
 
   // Write Combined Object Union
   {
-    _ = try out_writer.write(CombinedInterfaceBeginMsg);
-    protocol_opt = output.protocol_first;
+    _ = try writer.write(CombinedInterfaceBeginMsg);
+    protocol_opt = code_tree.protocol_first;
     while (protocol_opt) |protocol| : (protocol_opt = protocol.next) {
       var interface_opt: ?*EntryNode = protocol.interface_first;
       while (interface_opt) |interface| : (interface_opt = interface.next) {
-        try out_writer.print(
+        try writer.print(
           CombinedInterfaceEntryFmt,
           .{ interface.name, interface.identifier },
         );
       }
     }
 
-    _ = try out_writer.write(
+    _ = try writer.write(
       \\
       \\  pub fn message_decode(o: Object, proxy: *Proxy, op: u16, data: []const u8) Event {
       \\    return switch (o) {
       \\
     );
-    protocol_opt = output.protocol_first;
+    protocol_opt = code_tree.protocol_first;
     while (protocol_opt) |protocol| : (protocol_opt = protocol.next) {
       var interface_opt: ?*EntryNode = protocol.interface_first;
       while (interface_opt) |interface| : (interface_opt = interface.next) {
         if (interface.event_count > 0)
-          try out_writer.print("      .{s} => |interface_t| @TypeOf(interface_t).message_decode(proxy, op, data),\n", .{ interface.name });
+          try writer.print("      .{s} => |interface| @TypeOf(interface).message_decode(proxy, op, data),\n", .{ interface.name });
       }
     }
-    _ = try out_writer.write(
+    _ = try writer.write(
       \\      else => .invalid,
       \\    };
       \\  }
       \\
     );
-    _ = try out_writer.write(CombinedInterfaceEndMsg);
+    _ = try writer.write(CombinedInterfaceEndMsg);
   }
 
   // add import std for scoped log
-  _ = try out_writer.write(LogPaste);
-
-  try out.flush();
+  _ = try writer.write(LogPaste);
 }
 
 fn write_wl_interface(
   writer: *Io.Writer,
-  allocator: std.mem.Allocator,
   wl_interface: *EntryNode,
 ) !void {
   try writer.print(
@@ -206,7 +216,7 @@ fn write_wl_interface(
 
     var message_opt: ?*EntryNode = wl_interface.request_first;
     while (message_opt) |wl_request| : (message_opt = wl_request.next) {
-      try write_wl_message(writer, allocator, wl_interface, wl_request);
+      try write_wl_message(writer, wl_interface, wl_request);
     }
 
 
@@ -214,7 +224,7 @@ fn write_wl_interface(
 
       message_opt = wl_interface.event_first;
       while (message_opt) |wl_event| : (message_opt = wl_event.next) {
-        try write_wl_message(writer, allocator, wl_interface, wl_event);
+        try write_wl_message(writer, wl_interface, wl_event);
       }
 
       // write event parse
@@ -224,7 +234,7 @@ fn write_wl_interface(
       while (message_opt) |wl_event| : (message_opt = wl_event.next) {
         defer opcode += 1;
         try writer.print("        {d} => {{\n", .{opcode});
-        try write_wl_message_decode(writer, allocator, wl_interface.name, wl_event);
+        try write_wl_message_decode(writer, wl_interface.name, wl_event);
         try writer.print("        }},\n", .{});
       }
       _ = try writer.write(MessageDecodeEndMsg);
@@ -262,11 +272,9 @@ fn write_wl_interface(
 
 fn write_wl_message(
   writer: *Io.Writer,
-  arena: std.mem.Allocator,
   wl_interface: *EntryNode,
   wl_message: *EntryNode,
 ) !void {
-  _ = arena;
   switch (wl_message.type) {
     .request => {
       try writer.print(
@@ -516,11 +524,9 @@ fn write_wl_message_encode(
 
 fn write_wl_message_decode(
   writer: *Io.Writer,
-  allocator: std.mem.Allocator,
   wl_interface_name: []const u8,
   wl_message: *EntryNode,
 ) !void {
-  _ = allocator;
   var arg_opt: ?*EntryNode = wl_message.arg_first;
   _ = try writer.write(MessageDecodeArgsBeginMsg);
   while (arg_opt) |arg| : (arg_opt = arg.next) {
@@ -532,10 +538,12 @@ fn write_wl_message_decode(
   _ = try writer.write(MessageDecodeArgsEndMsg);
   _ = try writer.write("          proxy.message_decode(&args_in, data);\n");
 
-  _ = try writer.print("          break :event .{{\n", .{});
-  _ = try writer.print("            .{s}_{s} = ", .{ wl_interface_name, wl_message.name });
+  _ = try writer.print(
+    "          break :event .{{\n            .{s}_{s} = ",
+    .{ wl_interface_name, wl_message.name },
+  );
   if (wl_message.arg_count == 0) {
-    _ = try writer.print("{{\n", .{});
+    _ = try writer.print("{{}},\n", .{});
   } else {
     _ = try writer.print(".{{\n", .{});
     arg_opt = wl_message.arg_first;
@@ -550,8 +558,8 @@ fn write_wl_message_decode(
         _ = try writer.print("              .{s} = args_in[{d}].{s},\n", .{ arg.name, arg_no, @tagName(arg.data_type) });
       }
     }
+    _ = try writer.print("            }},\n", .{});
   }
-  _ = try writer.print("            }}\n", .{});
   _ = try writer.print("          }};\n", .{});
 }
 

@@ -9,9 +9,12 @@ interface provided by libwayland and the standard wayland-scanner.
 This generator currently only supports generating Zig code, but I plan
 to add an option to emit the code as a single-header C library too.
 
-
 I'll probably also give this all a cleanup pass soon. This code was all
 written rather quickly and probably can be tidied up.
+
+> [!NOTE]
+> This program currently only generates client-compatible code.
+> Support for server-compatible codegen may come later if I feel like it.
 
 ## Usage
 

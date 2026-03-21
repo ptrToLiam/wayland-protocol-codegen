@@ -1893,7 +1893,7 @@ const UsageMsgFmt =
 
 const OutputBeginString =
 \\//  This file is generated from provided Wayland XML specifications by
-\\//  wayland-protocol-codegen and should NOT be edited manually.
+\\//  wl-protocol-codegen and should NOT be edited manually.
 \\
 ;
 

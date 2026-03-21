@@ -21,7 +21,7 @@ pub fn build(b: *std.Build) !void {
   });
 
   const generator = b.addExecutable(.{
-    .name = "wayland-protocol-codegen",
+    .name = "wl-protocol-codegen",
     .root_module = root,
   });
   b.installArtifact(generator);
@@ -33,16 +33,13 @@ pub fn build(b: *std.Build) !void {
       wl_generate_cmd.addFileArg(protocol);
     }
 
-    wl_generate_cmd.addArg("-o");
-
     if (debug_opt) wl_generate_cmd.addArg("--debug");
-
+    wl_generate_cmd.addArg("-o");
     const protocols_zig = wl_generate_cmd.addOutputFileArg("protocols.zig");
 
     const protocols_zig_module = b.addModule("wayland-protocols", .{
       .root_source_file = protocols_zig,
     });
-
     _ = protocols_zig_module;
   }
 }
